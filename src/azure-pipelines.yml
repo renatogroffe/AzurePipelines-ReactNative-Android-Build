@@ -1,0 +1,56 @@
+trigger:
+- main
+
+variables:
+  vmImageName: 'macos-latest'
+  projectPath: './src/AppGroffe'
+  apkFilePath: 'android/app/build/outputs/apk/release'
+
+stages:
+- stage: BuildAndroid
+  displayName: Build Android
+  jobs:
+  - job: BuildAndroid
+    displayName: Build Android
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - script: sw_vers -productVersion
+      displayName: 'Exibir a versao atual do macOS'
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+      displayName: 'Configurar uso do Java 17'
+    - script: |
+        cd $(projectPath)
+        npm install
+      displayName: 'Instalar dependencias via npm install'
+    - task: Gradle@3
+      inputs:
+        gradleWrapperFile: '$(projectPath)/android/gradlew'
+        workingDirectory: '$(projectPath)/android'
+        tasks: 'assembleRelease'
+        publishJUnitResults: true
+        testResultsFiles: '**/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        gradleOptions: '-Xmx2048m'
+        sonarQubeRunAnalysis: false
+        spotBugsAnalysis: false
+      displayName: 'Build do App Android com Gradle'
+    - script: |
+        cd $(projectPath)
+        cd $(apkFilePath)
+        echo 'Diretorio com o resultado do build:'
+        pwd
+        echo ''
+        echo 'Arquivos gerados:'
+        ls
+      displayName: 'Listar apk gerado'
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(projectPath)/$(apkFilePath)/app-release.apk'
+        artifact: 'apk-appgroffe'
+        publishLocation: 'pipeline'
+      displayName: 'Publicar apk como Artifact'
